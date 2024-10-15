@@ -15,11 +15,10 @@ import 'package:flutter_idnow/flutter_idnow.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('getPlatformVersion test', (WidgetTester tester) async {
-    final FlutterIdnow plugin = FlutterIdnow();
-    final String? version = await FlutterIdnow.startIdentification(providerId: "", providerCompanyId: "");
+  testWidgets('startIdentification test', (WidgetTester tester) async {
+    final String? response = await FlutterIdnow.startIdentification(providerId: "", providerCompanyId: "");
     // The version string depends on the host platform running the test, so
     // just assert that some non-empty string is returned.
-    expect(version?.isNotEmpty, true);
+    expect(response?.isNotEmpty, true);
   });
 }

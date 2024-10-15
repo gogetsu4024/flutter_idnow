@@ -20,7 +20,6 @@ void main() {
   });
 
   test('getPlatformVersion', () async {
-    FlutterIdnow flutterIdnowPlugin = FlutterIdnow();
     MockFlutterIdnowPlatform fakePlatform = MockFlutterIdnowPlatform();
     FlutterIdnowPlatform.instance = fakePlatform;
 
