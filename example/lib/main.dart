@@ -1,7 +1,7 @@
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_idnow/flutter_idnow.dart';
 
@@ -21,15 +21,17 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    initPlatformState();
+    initIdNow();
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> initPlatformState() async {
+  Future<void> initIdNow() async {
     // Platform messages may fail, so we use a try/catch PlatformException.
     // We also handle the message potentially returning null.
     try {
-          await FlutterIdnow.startIdentification(providerId: "TS2-AFHCH", providerCompanyId: "expvodenovi")?? 'Unknown platform version';
+      var response = await FlutterIdnow.startIdentification(providerId: "TS2-AFHCH", providerCompanyId: "expvodenovi");
+      print("response");
+      print(response);
     } on PlatformException {
       if (kDebugMode) {
         print("issue with idnow plugin");
@@ -50,8 +52,14 @@ class _MyAppState extends State<MyApp> {
         appBar: AppBar(
           title: const Text('Plugin example app'),
         ),
-        body: const Center(
-          child: Text("idnow test"),
+        body: Center(
+          child: InkWell(
+              onTap: (){
+                    initIdNow();
+              },
+              child: const Text("idnow test"
+              )
+          ),
         ),
       ),
     );

@@ -45,6 +45,7 @@ class FlutterIdnowDelegate(private val activity: Activity) : PluginRegistry.Acti
                         val transactionToken = it.getStringExtra(IDnowSDK.RESULT_DATA_TRANSACTION_TOKEN)
                         Log.v(TAG, "success, transaction token: $transactionToken")
                         result?.success("success")
+                        result = null
                         return true
                     }
                 }
@@ -54,6 +55,7 @@ class FlutterIdnowDelegate(private val activity: Activity) : PluginRegistry.Acti
                         val errorMessage = it.getStringExtra(IDnowSDK.RESULT_DATA_ERROR)
                         Log.v(TAG, "canceled, transaction token: $transactionToken, error: $errorMessage")
                         result?.success(errorMessage)
+                        result = null
                         return true
                     }
                 }
@@ -63,11 +65,13 @@ class FlutterIdnowDelegate(private val activity: Activity) : PluginRegistry.Acti
                         val errorMessage = it.getStringExtra(IDnowSDK.RESULT_DATA_ERROR)
                         Log.v(TAG, "failed, transaction token: $transactionToken, error: $errorMessage")
                         result?.success(errorMessage)
+                        result = null
                         return true
                     }
                 }
                 else -> {
                     result?.success(resultCode)
+                    result = null
                     Log.v(TAG, "Result Code: $resultCode")
                     return true
                 }
