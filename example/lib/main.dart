@@ -30,8 +30,10 @@ class _MyAppState extends State<MyApp> {
     // We also handle the message potentially returning null.
     try {
       var response = await FlutterIdnow.startIdentification(providerId: "TS2-AFHCH", providerCompanyId: "expvodenovi");
-      print("response");
-      print(response);
+      if (kDebugMode) {
+        print("response");
+        print(response);
+      }
     } on PlatformException {
       if (kDebugMode) {
         print("issue with idnow plugin");
