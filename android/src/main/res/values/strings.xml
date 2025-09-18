@@ -43,4 +43,39 @@
         libero vel nunc consequat, quis tincidunt nisl eleifend. Cras bibendum enim a justo luctus
         vestibulum. Fusce dictum libero quis erat maximus, vitae volutpat diam dignissim.
     </string>
+    
+    <!-- IDnow SDK String Resources -->
+    <string name="archivingOff">Archiving Off</string>
+    <string name="archivingOn">Archiving On</string>
+    <string name="audioOnly">Audio Only</string>
+    <string name="e_signature_user_consent_headline">E-Signature User Consent</string>
+    <string name="endCall1">End Call</string>
+    <string name="endCall2">End Call</string>
+    <string name="ident_done_failed">Identification Failed</string>
+    <string name="identification_wait">Please Wait</string>
+    <string name="insert_tan_text">Please enter TAN</string>
+    <string name="insert_tan_wrong_tan">Wrong TAN entered</string>
+    <string name="network_dialog_title">Network Error</string>
+    <string name="notification">Notification</string>
+    <string name="notify_via_push_content">Push Notification Content</string>
+    <string name="notify_via_push_details">Push Notification Details</string>
+    <string name="notify_via_push_success_button">Continue</string>
+    <string name="notify_via_push_success_message">Push notification sent successfully</string>
+    <string name="notify_via_push_title">Push Notification</string>
+    <string name="permission_receive_sms">Permission to receive SMS</string>
+    <string name="permission_storage">Storage permission required</string>
+    <string name="push_requestpushbutton_title">Request Push Notification</string>
+    <string name="push_retrypushbutton_tile">Retry Push Notification</string>
+    <string name="push_stage1_title">Push Notification Stage 1</string>
+    <string name="push_stage2_details">Push Notification Stage 2 Details</string>
+    <string name="push_stage3_details">Push Notification Stage 3 Details</string>
+    <string name="push_stage3_title">Push Notification Stage 3</string>
+    <string name="result_screen_transaction_name_content">Transaction Name</string>
+    <string name="result_screen_transaction_name_title">Transaction</string>
+    <string name="result_screen_transaction_nr_content">Transaction Number</string>
+    <string name="result_success_title_pushnotification">Success - Push Notification</string>
+    <string name="result_success_title_smsnotification">Success - SMS Notification</string>
+    <string name="title_live_stream_screen">Live Stream</string>
+    <string name="waiting_screen_action_push_notification">Waiting for push notification</string>
+    <string name="waiting_screen_sms_confirmation_title">SMS Confirmation</string>
 </resources>
