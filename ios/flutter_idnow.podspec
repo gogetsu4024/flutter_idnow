@@ -13,7 +13,7 @@ Flutter wrapper for IDNOW
   s.dependency       'Flutter'
   s.platform         = :ios, '9.0'  # or higher based on your app
   s.static_framework  = true
-  s.dependency       'IDnowSDK', '~> 8.4.0'
+  s.dependency       'IDnowSDK', '~> 9.7.0'
   s.pod_target_xcconfig = {
     "HEADER_SEARCH_PATHS" => '"${PODS_ROOT}/IDnowSDK/include"'
   }
