@@ -2,8 +2,8 @@ PODS:
   - Flutter (1.0.0)
   - flutter_idnow (0.0.1):
     - Flutter
-    - IDnowSDK (~> 8.4.0)
-  - IDnowSDK (8.4.0)
+    - IDnowSDK (~> 9.7.0)
+  - IDnowSDK (9.7.0)
   - integration_test (0.0.1):
     - Flutter
 
@@ -26,10 +26,10 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
-  flutter_idnow: 09d6b21a0d819a6365f660cb2918a8427ea21997
-  IDnowSDK: 83758d5b5bf1158c0702962cdb349292ba285367
+  flutter_idnow: 14200d84eaac079206b06cd87bdf746893337f7b
+  IDnowSDK: 0d6998336fc35f328ed388f31589b82fa756ac61
   integration_test: 252f60fa39af5e17c3aa9899d35d908a0721b573
 
-PODFILE CHECKSUM: 819463e6a0290f5a72f145ba7cde16e8b6ef0796
+PODFILE CHECKSUM: 1959d098c91d8a792531a723c4a9d7e9f6a01e38
 
 COCOAPODS: 1.15.2

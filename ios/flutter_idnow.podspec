@@ -11,7 +11,7 @@ Flutter wrapper for IDNOW
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*.{h,m}' # Adjust this if you keep Swift
   s.dependency       'Flutter'
-  s.platform         = :ios, '9.0'  # or higher based on your app
+  s.platform         = :ios, '14.0'  # or higher based on your app
   s.static_framework  = true
   s.dependency       'IDnowSDK', '~> 9.7.0'
   s.pod_target_xcconfig = {
