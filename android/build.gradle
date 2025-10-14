@@ -54,7 +54,7 @@ android {
     dependencies {
         testImplementation("org.jetbrains.kotlin:kotlin-test")
         testImplementation("org.mockito:mockito-core:5.0.0")
-        implementation 'de.idnow.sdk:idnow-android-sdk:9.6.2'
+        implementation 'de.idnow.sdk:idnow-android-sdk:9.6.3'
         implementation files ('libs/bcprov-jdk15to18-164.jar')
         implementation files ('libs/bctls-jdk15to18-164.jar')
         implementation 'androidx.appcompat:appcompat:1.6.1'
