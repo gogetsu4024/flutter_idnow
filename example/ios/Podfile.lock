@@ -2,15 +2,12 @@ PODS:
   - Flutter (1.0.0)
   - flutter_idnow (0.0.1):
     - Flutter
-    - IDnowSDK (~> 9.7.0)
-  - IDnowSDK (9.7.0)
-  - integration_test (0.0.1):
-    - Flutter
+    - IDnowSDK (= 9.7.12)
+  - IDnowSDK (9.7.12)
 
 DEPENDENCIES:
   - Flutter (from `Flutter`)
   - flutter_idnow (from `.symlinks/plugins/flutter_idnow/ios`)
-  - integration_test (from `.symlinks/plugins/integration_test/ios`)
 
 SPEC REPOS:
   trunk:
@@ -21,15 +18,12 @@ EXTERNAL SOURCES:
     :path: Flutter
   flutter_idnow:
     :path: ".symlinks/plugins/flutter_idnow/ios"
-  integration_test:
-    :path: ".symlinks/plugins/integration_test/ios"
 
 SPEC CHECKSUMS:
-  Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
-  flutter_idnow: 14200d84eaac079206b06cd87bdf746893337f7b
-  IDnowSDK: 0d6998336fc35f328ed388f31589b82fa756ac61
-  integration_test: 252f60fa39af5e17c3aa9899d35d908a0721b573
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  flutter_idnow: bd68c0619e821d1aef72c086344b48e9ea6e125a
+  IDnowSDK: 7b8637a0d9c114d17f55b91ef29a193215049eb2
 
 PODFILE CHECKSUM: 1959d098c91d8a792531a723c4a9d7e9f6a01e38
 
-COCOAPODS: 1.15.2
+COCOAPODS: 1.16.2

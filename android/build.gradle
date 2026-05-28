@@ -18,6 +18,9 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        maven {
+            url "https://raw.githubusercontent.com/idnow/de.idnow.android/master"
+        }
     }
 }
 
@@ -54,7 +57,7 @@ android {
     dependencies {
         testImplementation("org.jetbrains.kotlin:kotlin-test")
         testImplementation("org.mockito:mockito-core:5.0.0")
-        implementation 'de.idnow.sdk:idnow-android-sdk:9.7.4'
+        implementation 'de.idnow.sdk:idnow-android-sdk:9.7.11'
         implementation files ('libs/bcprov-jdk15to18-164.jar')
         implementation files ('libs/bctls-jdk15to18-164.jar')
         implementation 'androidx.appcompat:appcompat:1.6.1'
