@@ -1,109 +1,161 @@
 #import "FlutterIdnowPlugin.h"
 
-
 #import "IDnowSDK.h"
-
 
 @implementation FlutterIdnowPlugin {
     FlutterResult _result;
     NSDictionary *_arguments;
-    UIViewController *_viewController;
+    __weak NSObject<FlutterPluginRegistrar> *_registrar;
 }
+
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
     FlutterMethodChannel* channel = [FlutterMethodChannel
             methodChannelWithName:@"flutter_idnow"
                   binaryMessenger:[registrar messenger]];
 
-    UIViewController *viewController = [UIApplication sharedApplication].delegate.window.rootViewController;
-    FlutterIdnowPlugin* instance = [[FlutterIdnowPlugin alloc] initWithViewController:viewController];
+    FlutterIdnowPlugin* instance = [[FlutterIdnowPlugin alloc] initWithRegistrar:registrar];
     [registrar addMethodCallDelegate:instance channel:channel];
 }
 
-
-- (instancetype)initWithViewController:(UIViewController *)viewController {
+- (instancetype)initWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
     self = [super init];
     if (self) {
-        _viewController = viewController;
+        _registrar = registrar;
     }
     return self;
 }
 
-- (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
-    NSLog(@"Something To Print");
-  if ([@"startIdentification" isEqualToString:call.method]) {
-      
-      //get arguments
-      _arguments = call.arguments;
-      _result = result;
-      // Setup IDnowAppearance
-      IDnowAppearance *appearance = [IDnowAppearance sharedAppearance];
+- (UIViewController *)topViewController {
+    UIViewController *rootViewController = [_registrar viewController];
 
-          
-      // Adjust statusbar
-      appearance.enableStatusBarStyleLightContent = YES;
-          
-      
-      // Adjust fonts
-      appearance.fontNameRegular = @"AmericanTypewriter";
-      appearance.fontNameLight = @"AmericanTypewriter-Light";
-      appearance.fontNameMedium = @"AmericanTypewriter-CondensedBold";
+    if (rootViewController == nil) {
+        for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+            if (scene.activationState != UISceneActivationStateForegroundInactive &&
+                scene.activationState != UISceneActivationStateForegroundActive) {
+                continue;
+            }
+            if (![scene isKindOfClass:[UIWindowScene class]]) {
+                continue;
+            }
 
-      // To adjust navigation bar / bar button items etc. you should follow Apples UIAppearance protocol.
+            UIWindowScene *windowScene = (UIWindowScene *)scene;
+            for (UIWindow *window in windowScene.windows) {
+                if (window.isKeyWindow && window.rootViewController != nil) {
+                    rootViewController = window.rootViewController;
+                    break;
+                }
+            }
 
-      // Setup IDnowSettings (SDK 9.7+ requires transaction token at initialization)
-      NSString *transactionToken = [_arguments objectForKey:@"providerId"];
-      NSString *companyID = [_arguments objectForKey:@"providerCompanyId"];
-      IDnowSettings *settings;
-      if (companyID != nil && companyID.length > 0) {
-          settings = [IDnowSettings settingsWithCompanyID:companyID transactionToken:transactionToken];
-      } else {
-          settings = [IDnowSettings settingsWithTransactionToken:transactionToken];
-      }
-      
+            if (rootViewController != nil) {
+                break;
+            }
+        }
+    }
 
-      // Initialise and start identification
-      IDnowController *idnowController = [[IDnowController alloc] initWithSettings: settings];
-      
-      
-      // Initialize identification using blocks
-      // (alternatively you can set the delegate and implement the IDnowControllerDelegate protocol)
-      [idnowController initializeWithCompletionBlock: ^(BOOL success, NSError *error, BOOL canceledByUser)
-      {
-              if ( success )
-              {
-                    // Start identification using blocks
-                  [idnowController startIdentificationFromViewController: self->_viewController
-                    withCompletionBlock: ^(BOOL success, NSError *error, BOOL canceledByUser)
-                    {
-                            if ( success )
-                            {
-                                _result(@"success");
-                                // identification was successfull
-                            }
-                            else
-                            {
-                                self->_result(@"failed");
-                                // identification failed / canceled
-                            }
-                      }];
-              }
-              else if ( error )
-                     {
-                           // Present an alert containing localized error description
-                           UIAlertController *alertController = [UIAlertController alertControllerWithTitle: @"Error"
-                           message: error.localizedDescription
-                           preferredStyle: UIAlertControllerStyleAlert];
-                           UIAlertAction *action = [UIAlertAction actionWithTitle: @"Ok"
-                           style: UIAlertActionStyleCancel
-                           handler: nil];
-                           [alertController addAction: action];
-                         [self->_viewController presentViewController: alertController animated: true completion: nil];
-                         [self->_viewController.navigationController setNavigationBarHidden:YES animated:YES];
-                         self->_result(@"failed");
-                     }
-          }];
-  } else {
-      [self->_viewController.navigationController setNavigationBarHidden:YES animated:YES];
-  }
+    UIViewController *topController = rootViewController;
+    while (topController.presentedViewController != nil) {
+        topController = topController.presentedViewController;
+    }
+
+    return topController;
 }
+
+- (void)completePendingResult:(NSString *)value {
+    FlutterResult pendingResult = _result;
+    _result = nil;
+    if (pendingResult != nil) {
+        pendingResult(value);
+    }
+}
+
+- (void)presentFailureAlertOnViewController:(UIViewController *)viewController
+                                    message:(NSString *)message {
+    if (viewController == nil) {
+        [self completePendingResult:@"failed"];
+        return;
+    }
+
+    UIAlertController *alertController = [UIAlertController alertControllerWithTitle:@"Error"
+                                                                             message:message
+                                                                      preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertAction *action = [UIAlertAction actionWithTitle:@"Ok"
+                                                     style:UIAlertActionStyleCancel
+                                                   handler:nil];
+    [alertController addAction:action];
+    [viewController presentViewController:alertController animated:YES completion:nil];
+
+    if (viewController.navigationController != nil) {
+        [viewController.navigationController setNavigationBarHidden:YES animated:YES];
+    }
+
+    [self completePendingResult:@"failed"];
+}
+
+- (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
+    if ([@"startIdentification" isEqualToString:call.method]) {
+        _arguments = call.arguments;
+        _result = result;
+
+        UIViewController *presentingViewController = [self topViewController];
+        if (presentingViewController == nil) {
+            [self presentFailureAlertOnViewController:nil
+                                              message:@"Unable to start identification. No active view controller found."];
+            return;
+        }
+
+        IDnowAppearance *appearance = [IDnowAppearance sharedAppearance];
+        appearance.enableStatusBarStyleLightContent = YES;
+        appearance.fontNameRegular = @"AmericanTypewriter";
+        appearance.fontNameLight = @"AmericanTypewriter-Light";
+        appearance.fontNameMedium = @"AmericanTypewriter-CondensedBold";
+
+        NSString *transactionToken = [_arguments objectForKey:@"providerId"];
+        NSString *companyID = [_arguments objectForKey:@"providerCompanyId"];
+        IDnowSettings *settings;
+        if (companyID != nil && companyID.length > 0) {
+            settings = [IDnowSettings settingsWithCompanyID:companyID transactionToken:transactionToken];
+        } else {
+            settings = [IDnowSettings settingsWithTransactionToken:transactionToken];
+        }
+
+        IDnowController *idnowController = [[IDnowController alloc] initWithSettings:settings];
+
+        [idnowController initializeWithCompletionBlock:^(BOOL success, NSError *error, BOOL canceledByUser) {
+            if (success) {
+                UIViewController *activeViewController = [self topViewController] ?: presentingViewController;
+                [idnowController startIdentificationFromViewController:activeViewController
+                                                   withCompletionBlock:^(BOOL identificationSuccess, NSError *identificationError, BOOL identificationCanceledByUser) {
+                    if (identificationSuccess) {
+                        [self completePendingResult:@"success"];
+                    } else {
+                        NSString *message = identificationError.localizedDescription;
+                        if (message.length == 0) {
+                            message = identificationCanceledByUser
+                                ? @"Identification was canceled."
+                                : @"Identification failed.";
+                        }
+                        [self presentFailureAlertOnViewController:activeViewController message:message];
+                    }
+                }];
+            } else if (error != nil) {
+                [self presentFailureAlertOnViewController:presentingViewController
+                                                message:error.localizedDescription];
+            } else {
+                NSString *message = canceledByUser
+                    ? @"Identification setup was canceled."
+                    : @"Identification setup failed.";
+                [self presentFailureAlertOnViewController:presentingViewController message:message];
+            }
+        }];
+    } else if ([@"removeHeader" isEqualToString:call.method]) {
+        UIViewController *viewController = [self topViewController];
+        if (viewController.navigationController != nil) {
+            [viewController.navigationController setNavigationBarHidden:YES animated:YES];
+        }
+        result(@"success");
+    } else {
+        result(FlutterMethodNotImplemented);
+    }
+}
+
 @end
