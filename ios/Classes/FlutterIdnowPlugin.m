@@ -329,6 +329,13 @@
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
     if ([@"startIdentification" isEqualToString:call.method]) {
+#if DEBUG
+        NSString *simulateResponse = [NSProcessInfo processInfo].environment[@"IDNOW_SIMULATE_RESPONSE"];
+        if (simulateResponse.length > 0) {
+            result(simulateResponse);
+            return;
+        }
+#endif
         _arguments = call.arguments;
         _result = result;
 
