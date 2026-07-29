@@ -8,6 +8,10 @@
     NSDictionary *_arguments;
     __weak NSObject<FlutterPluginRegistrar> *_registrar;
     dispatch_block_t _presentationWatchdog;
+    dispatch_block_t _dismissGracePeriodBlock;
+    dispatch_source_t _visibilityPollTimer;
+    BOOL _idnowUiWasEverVisible;
+    BOOL _idnowUiCurrentlyVisible;
 }
 
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
@@ -62,6 +66,10 @@
     return topController;
 }
 
+- (BOOL)isIdnowUiVisible {
+    return [self isIdnowUiVisibleFromViewController:[self topViewController]];
+}
+
 - (BOOL)isIdnowUiVisibleFromViewController:(UIViewController *)viewController {
     if (viewController == nil) {
         return NO;
@@ -103,8 +111,89 @@
     }
 }
 
-- (void)schedulePresentationWatchdog {
+- (void)cancelDismissGracePeriod {
+    if (_dismissGracePeriodBlock != nil) {
+        dispatch_block_cancel(_dismissGracePeriodBlock);
+        _dismissGracePeriodBlock = nil;
+    }
+}
+
+- (void)stopSessionMonitoring {
+    [self cancelPresentationWatchdog];
+    [self cancelDismissGracePeriod];
+
+    if (_visibilityPollTimer != nil) {
+        dispatch_source_cancel(_visibilityPollTimer);
+        _visibilityPollTimer = nil;
+    }
+}
+
+- (void)startSessionMonitoring {
+    [self stopSessionMonitoring];
+    _idnowUiWasEverVisible = NO;
+    _idnowUiCurrentlyVisible = NO;
+
+    __weak typeof(self) weakSelf = self;
+    _visibilityPollTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
+    dispatch_source_set_timer(_visibilityPollTimer, DISPATCH_TIME_NOW, (uint64_t)(0.3 * NSEC_PER_SEC), (uint64_t)(0.1 * NSEC_PER_SEC));
+    dispatch_source_set_event_handler(_visibilityPollTimer, ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (strongSelf == nil) {
+            return;
+        }
+
+        if (strongSelf->_result == nil) {
+            [strongSelf stopSessionMonitoring];
+            return;
+        }
+
+        BOOL visible = [strongSelf isIdnowUiVisible];
+        if (visible) {
+            strongSelf->_idnowUiWasEverVisible = YES;
+            strongSelf->_idnowUiCurrentlyVisible = YES;
+            [strongSelf cancelDismissGracePeriod];
+            return;
+        }
+
+        if (strongSelf->_idnowUiCurrentlyVisible) {
+            strongSelf->_idnowUiCurrentlyVisible = NO;
+            [strongSelf scheduleDismissGracePeriod];
+        }
+    });
+    dispatch_source_resume(_visibilityPollTimer);
+
     [self schedulePresentationWatchdogWithAttempt:0];
+}
+
+- (void)scheduleDismissGracePeriod {
+    [self cancelDismissGracePeriod];
+
+    __weak typeof(self) weakSelf = self;
+    _dismissGracePeriodBlock = dispatch_block_create(0, ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (strongSelf == nil || strongSelf->_result == nil) {
+            return;
+        }
+
+        if ([strongSelf isIdnowUiVisible]) {
+            strongSelf->_idnowUiCurrentlyVisible = YES;
+            return;
+        }
+
+        if (!strongSelf->_idnowUiWasEverVisible) {
+            return;
+        }
+
+        if ([strongSelf isCameraOrMicrophoneDenied]) {
+            [strongSelf completePendingResult:@"idnow_camera_permission_denied"];
+        } else {
+            [strongSelf completePendingResult:@"idnow_cancelled"];
+        }
+    });
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(),
+                   _dismissGracePeriodBlock);
 }
 
 - (void)schedulePresentationWatchdogWithAttempt:(NSInteger)attempt {
@@ -117,7 +206,7 @@
             return;
         }
 
-        if ([strongSelf isIdnowUiVisibleFromViewController:[strongSelf topViewController]]) {
+        if (strongSelf->_idnowUiWasEverVisible) {
             return;
         }
 
@@ -142,7 +231,7 @@
 }
 
 - (void)completePendingResult:(NSString *)value {
-    [self cancelPresentationWatchdog];
+    [self stopSessionMonitoring];
 
     FlutterResult pendingResult = _result;
     _result = nil;
@@ -153,6 +242,30 @@
 
 - (void)completePreStartFailure:(NSString *)value {
     [self completePendingResult:value];
+}
+
+- (void)completeIdentificationFailureWithError:(NSError *)identificationError
+                            canceledByUser:(BOOL)identificationCanceledByUser
+                        activeViewController:(UIViewController *)activeViewController {
+    if (identificationCanceledByUser || _idnowUiWasEverVisible) {
+        if ([self isCameraOrMicrophoneDenied]) {
+            [self completePendingResult:@"idnow_camera_permission_denied"];
+        } else {
+            [self completePendingResult:@"idnow_cancelled"];
+        }
+        return;
+    }
+
+    if ([self isCameraOrMicrophoneDenied]) {
+        [self completePendingResult:@"idnow_camera_permission_denied"];
+        return;
+    }
+
+    NSString *message = identificationError.localizedDescription;
+    if (message.length == 0) {
+        message = @"Identification failed.";
+    }
+    [self presentFailureAlertOnViewController:activeViewController message:message];
 }
 
 - (void)presentFailureAlertOnViewController:(UIViewController *)viewController
@@ -209,21 +322,15 @@
         [idnowController initializeWithCompletionBlock:^(BOOL success, NSError *error, BOOL canceledByUser) {
             if (success) {
                 UIViewController *activeViewController = [self topViewController] ?: presentingViewController;
-                [self schedulePresentationWatchdog];
+                [self startSessionMonitoring];
                 [idnowController startIdentificationFromViewController:activeViewController
                                                    withCompletionBlock:^(BOOL identificationSuccess, NSError *identificationError, BOOL identificationCanceledByUser) {
                     if (identificationSuccess) {
                         [self completePendingResult:@"success"];
-                    } else if (identificationCanceledByUser) {
-                        [self completePendingResult:@"idnow_cancelled"];
-                    } else if ([self isCameraOrMicrophoneDenied]) {
-                        [self completePendingResult:@"idnow_camera_permission_denied"];
                     } else {
-                        NSString *message = identificationError.localizedDescription;
-                        if (message.length == 0) {
-                            message = @"Identification failed.";
-                        }
-                        [self presentFailureAlertOnViewController:activeViewController message:message];
+                        [self completeIdentificationFailureWithError:identificationError
+                                                      canceledByUser:identificationCanceledByUser
+                                              activeViewController:activeViewController];
                     }
                 }];
             } else if (canceledByUser) {
