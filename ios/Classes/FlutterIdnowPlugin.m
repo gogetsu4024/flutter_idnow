@@ -6,6 +6,7 @@
     FlutterResult _result;
     NSDictionary *_arguments;
     __weak NSObject<FlutterPluginRegistrar> *_registrar;
+    dispatch_block_t _presentationWatchdog;
 }
 
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
@@ -60,12 +61,66 @@
     return topController;
 }
 
+- (BOOL)isIdnowUiVisibleFromViewController:(UIViewController *)viewController {
+    if (viewController == nil) {
+        return NO;
+    }
+
+    NSString *className = NSStringFromClass([viewController class]);
+    if ([className rangeOfString:@"IDnow" options:NSCaseInsensitiveSearch].location != NSNotFound) {
+        return YES;
+    }
+
+    for (UIViewController *child in viewController.childViewControllers) {
+        if ([self isIdnowUiVisibleFromViewController:child]) {
+            return YES;
+        }
+    }
+
+    return [self isIdnowUiVisibleFromViewController:viewController.presentedViewController];
+}
+
+- (void)cancelPresentationWatchdog {
+    if (_presentationWatchdog != nil) {
+        dispatch_block_cancel(_presentationWatchdog);
+        _presentationWatchdog = nil;
+    }
+}
+
+- (void)schedulePresentationWatchdog {
+    [self cancelPresentationWatchdog];
+
+    __weak typeof(self) weakSelf = self;
+    _presentationWatchdog = dispatch_block_create(0, ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (strongSelf == nil || strongSelf->_result == nil) {
+            return;
+        }
+
+        if ([strongSelf isIdnowUiVisibleFromViewController:[strongSelf topViewController]]) {
+            return;
+        }
+
+        [strongSelf completePendingResult:@"idnow_presentation_failed"];
+    });
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.5 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(),
+                   _presentationWatchdog);
+}
+
 - (void)completePendingResult:(NSString *)value {
+    [self cancelPresentationWatchdog];
+
     FlutterResult pendingResult = _result;
     _result = nil;
     if (pendingResult != nil) {
         pendingResult(value);
     }
+}
+
+- (void)completePreStartFailure:(NSString *)value {
+    [self completePendingResult:value];
 }
 
 - (void)presentFailureAlertOnViewController:(UIViewController *)viewController
@@ -98,8 +153,7 @@
 
         UIViewController *presentingViewController = [self topViewController];
         if (presentingViewController == nil) {
-            [self presentFailureAlertOnViewController:nil
-                                              message:@"Unable to start identification. No active view controller found."];
+            [self completePreStartFailure:@"idnow_no_view_controller"];
             return;
         }
 
@@ -123,6 +177,7 @@
         [idnowController initializeWithCompletionBlock:^(BOOL success, NSError *error, BOOL canceledByUser) {
             if (success) {
                 UIViewController *activeViewController = [self topViewController] ?: presentingViewController;
+                [self schedulePresentationWatchdog];
                 [idnowController startIdentificationFromViewController:activeViewController
                                                    withCompletionBlock:^(BOOL identificationSuccess, NSError *identificationError, BOOL identificationCanceledByUser) {
                     if (identificationSuccess) {
@@ -138,13 +193,9 @@
                     }
                 }];
             } else if (error != nil) {
-                [self presentFailureAlertOnViewController:presentingViewController
-                                                message:error.localizedDescription];
+                [self completePreStartFailure:@"idnow_initialize_failed"];
             } else {
-                NSString *message = canceledByUser
-                    ? @"Identification setup was canceled."
-                    : @"Identification setup failed.";
-                [self presentFailureAlertOnViewController:presentingViewController message:message];
+                [self completePreStartFailure:@"idnow_initialize_failed"];
             }
         }];
     } else if ([@"removeHeader" isEqualToString:call.method]) {
