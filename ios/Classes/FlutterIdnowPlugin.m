@@ -2,6 +2,7 @@
 
 #import "IDnowSDK.h"
 #import <AVFoundation/AVFoundation.h>
+#import <dispatch/dispatch.h>
 
 @implementation FlutterIdnowPlugin {
     FlutterResult _result;
