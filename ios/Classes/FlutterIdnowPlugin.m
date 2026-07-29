@@ -7,9 +7,11 @@
     FlutterResult _result;
     NSDictionary *_arguments;
     __weak NSObject<FlutterPluginRegistrar> *_registrar;
+    __weak UIViewController *_sessionRootViewController;
     dispatch_block_t _presentationWatchdog;
     dispatch_block_t _dismissGracePeriodBlock;
     dispatch_block_t _visibilityPollBlock;
+    BOOL _identificationSessionStarted;
     BOOL _idnowUiWasEverVisible;
     BOOL _idnowUiCurrentlyVisible;
 }
@@ -66,10 +68,6 @@
     return topController;
 }
 
-- (BOOL)isIdnowUiVisible {
-    return [self isIdnowUiVisibleFromViewController:[self topViewController]];
-}
-
 - (BOOL)isIdnowUiVisibleFromViewController:(UIViewController *)viewController {
     if (viewController == nil) {
         return NO;
@@ -87,6 +85,19 @@
     }
 
     return [self isIdnowUiVisibleFromViewController:viewController.presentedViewController];
+}
+
+- (BOOL)isIdentificationSessionUiVisible {
+    if ([self isIdnowUiVisibleFromViewController:[self topViewController]]) {
+        return YES;
+    }
+
+    if (!_identificationSessionStarted) {
+        return NO;
+    }
+
+    UIViewController *sessionRoot = _sessionRootViewController ?: [self topViewController];
+    return sessionRoot.presentedViewController != nil;
 }
 
 - (BOOL)isCameraOrMicrophoneDenied {
@@ -129,6 +140,14 @@
     [self cancelPresentationWatchdog];
     [self cancelDismissGracePeriod];
     [self cancelVisibilityPoll];
+    _identificationSessionStarted = NO;
+    _sessionRootViewController = nil;
+}
+
+- (void)markIdentificationSessionStartedWithViewController:(UIViewController *)viewController {
+    _identificationSessionStarted = YES;
+    _sessionRootViewController = viewController;
+    [self cancelPresentationWatchdog];
 }
 
 - (void)scheduleVisibilityPoll {
@@ -146,7 +165,7 @@
             return;
         }
 
-        BOOL visible = [strongSelf isIdnowUiVisible];
+        BOOL visible = [strongSelf isIdentificationSessionUiVisible];
         if (visible) {
             strongSelf->_idnowUiWasEverVisible = YES;
             strongSelf->_idnowUiCurrentlyVisible = YES;
@@ -168,6 +187,7 @@
     [self stopSessionMonitoring];
     _idnowUiWasEverVisible = NO;
     _idnowUiCurrentlyVisible = NO;
+    _identificationSessionStarted = NO;
 
     [self scheduleVisibilityPoll];
     [self schedulePresentationWatchdogWithAttempt:0];
@@ -183,12 +203,13 @@
             return;
         }
 
-        if ([strongSelf isIdnowUiVisible]) {
+        if ([strongSelf isIdentificationSessionUiVisible]) {
             strongSelf->_idnowUiCurrentlyVisible = YES;
+            strongSelf->_idnowUiWasEverVisible = YES;
             return;
         }
 
-        if (!strongSelf->_idnowUiWasEverVisible) {
+        if (!strongSelf->_idnowUiWasEverVisible && !strongSelf->_identificationSessionStarted) {
             return;
         }
 
@@ -205,16 +226,23 @@
 }
 
 - (void)schedulePresentationWatchdogWithAttempt:(NSInteger)attempt {
+    if (_identificationSessionStarted) {
+        return;
+    }
+
     [self cancelPresentationWatchdog];
 
     __weak typeof(self) weakSelf = self;
     _presentationWatchdog = dispatch_block_create(0, ^{
         __strong typeof(weakSelf) strongSelf = weakSelf;
-        if (strongSelf == nil || strongSelf->_result == nil) {
+        if (strongSelf == nil || strongSelf->_result == nil || strongSelf->_identificationSessionStarted) {
             return;
         }
 
-        if (strongSelf->_idnowUiWasEverVisible) {
+        if ([strongSelf isIdentificationSessionUiVisible]) {
+            if (attempt < 8) {
+                [strongSelf schedulePresentationWatchdogWithAttempt:attempt + 1];
+            }
             return;
         }
 
@@ -255,7 +283,7 @@
 - (void)completeIdentificationFailureWithError:(NSError *)identificationError
                             canceledByUser:(BOOL)identificationCanceledByUser
                         activeViewController:(UIViewController *)activeViewController {
-    if (identificationCanceledByUser || _idnowUiWasEverVisible) {
+    if (_identificationSessionStarted || identificationCanceledByUser || _idnowUiWasEverVisible) {
         if ([self isCameraOrMicrophoneDenied]) {
             [self completePendingResult:@"idnow_camera_permission_denied"];
         } else {
@@ -331,6 +359,7 @@
             if (success) {
                 UIViewController *activeViewController = [self topViewController] ?: presentingViewController;
                 [self startSessionMonitoring];
+                [self markIdentificationSessionStartedWithViewController:activeViewController];
                 [idnowController startIdentificationFromViewController:activeViewController
                                                    withCompletionBlock:^(BOOL identificationSuccess, NSError *identificationError, BOOL identificationCanceledByUser) {
                     if (identificationSuccess) {
