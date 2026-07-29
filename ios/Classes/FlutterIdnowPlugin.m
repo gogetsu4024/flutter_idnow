@@ -2,7 +2,6 @@
 
 #import "IDnowSDK.h"
 #import <AVFoundation/AVFoundation.h>
-#import <dispatch/dispatch.h>
 
 @implementation FlutterIdnowPlugin {
     FlutterResult _result;
@@ -10,7 +9,7 @@
     __weak NSObject<FlutterPluginRegistrar> *_registrar;
     dispatch_block_t _presentationWatchdog;
     dispatch_block_t _dismissGracePeriodBlock;
-    dispatch_source_t _visibilityPollTimer;
+    dispatch_block_t _visibilityPollBlock;
     BOOL _idnowUiWasEverVisible;
     BOOL _idnowUiCurrentlyVisible;
 }
@@ -119,25 +118,24 @@
     }
 }
 
-- (void)stopSessionMonitoring {
-    [self cancelPresentationWatchdog];
-    [self cancelDismissGracePeriod];
-
-    if (_visibilityPollTimer != nil) {
-        dispatch_source_cancel(_visibilityPollTimer);
-        _visibilityPollTimer = nil;
+- (void)cancelVisibilityPoll {
+    if (_visibilityPollBlock != nil) {
+        dispatch_block_cancel(_visibilityPollBlock);
+        _visibilityPollBlock = nil;
     }
 }
 
-- (void)startSessionMonitoring {
-    [self stopSessionMonitoring];
-    _idnowUiWasEverVisible = NO;
-    _idnowUiCurrentlyVisible = NO;
+- (void)stopSessionMonitoring {
+    [self cancelPresentationWatchdog];
+    [self cancelDismissGracePeriod];
+    [self cancelVisibilityPoll];
+}
+
+- (void)scheduleVisibilityPoll {
+    [self cancelVisibilityPoll];
 
     __weak typeof(self) weakSelf = self;
-    _visibilityPollTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
-    dispatch_source_set_timer(_visibilityPollTimer, DISPATCH_TIME_NOW, (uint64_t)(0.3 * NSEC_PER_SEC), (uint64_t)(0.1 * NSEC_PER_SEC));
-    dispatch_source_set_event_handler(_visibilityPollTimer, ^{
+    _visibilityPollBlock = dispatch_block_create(0, ^{
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (strongSelf == nil) {
             return;
@@ -153,16 +151,25 @@
             strongSelf->_idnowUiWasEverVisible = YES;
             strongSelf->_idnowUiCurrentlyVisible = YES;
             [strongSelf cancelDismissGracePeriod];
-            return;
-        }
-
-        if (strongSelf->_idnowUiCurrentlyVisible) {
+        } else if (strongSelf->_idnowUiCurrentlyVisible) {
             strongSelf->_idnowUiCurrentlyVisible = NO;
             [strongSelf scheduleDismissGracePeriod];
         }
-    });
-    dispatch_source_resume(_visibilityPollTimer);
 
+        [strongSelf scheduleVisibilityPoll];
+    });
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(),
+                   _visibilityPollBlock);
+}
+
+- (void)startSessionMonitoring {
+    [self stopSessionMonitoring];
+    _idnowUiWasEverVisible = NO;
+    _idnowUiCurrentlyVisible = NO;
+
+    [self scheduleVisibilityPoll];
     [self schedulePresentationWatchdogWithAttempt:0];
 }
 
