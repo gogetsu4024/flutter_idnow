@@ -1,6 +1,7 @@
 #import "FlutterIdnowPlugin.h"
 
 #import "IDnowSDK.h"
+#import <AVFoundation/AVFoundation.h>
 
 @implementation FlutterIdnowPlugin {
     FlutterResult _result;
@@ -80,6 +81,21 @@
     return [self isIdnowUiVisibleFromViewController:viewController.presentedViewController];
 }
 
+- (BOOL)isCameraOrMicrophoneDenied {
+    AVAuthorizationStatus cameraStatus = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo];
+    AVAuthorizationStatus micStatus = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio];
+
+    return cameraStatus == AVAuthorizationStatusDenied || cameraStatus == AVAuthorizationStatusRestricted ||
+           micStatus == AVAuthorizationStatusDenied || micStatus == AVAuthorizationStatusRestricted;
+}
+
+- (BOOL)isCameraOrMicrophonePermissionPending {
+    AVAuthorizationStatus cameraStatus = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo];
+    AVAuthorizationStatus micStatus = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio];
+
+    return cameraStatus == AVAuthorizationStatusNotDetermined || micStatus == AVAuthorizationStatusNotDetermined;
+}
+
 - (void)cancelPresentationWatchdog {
     if (_presentationWatchdog != nil) {
         dispatch_block_cancel(_presentationWatchdog);
@@ -88,6 +104,10 @@
 }
 
 - (void)schedulePresentationWatchdog {
+    [self schedulePresentationWatchdogWithAttempt:0];
+}
+
+- (void)schedulePresentationWatchdogWithAttempt:(NSInteger)attempt {
     [self cancelPresentationWatchdog];
 
     __weak typeof(self) weakSelf = self;
@@ -98,6 +118,18 @@
         }
 
         if ([strongSelf isIdnowUiVisibleFromViewController:[strongSelf topViewController]]) {
+            return;
+        }
+
+        if ([strongSelf isCameraOrMicrophonePermissionPending]) {
+            if (attempt < 8) {
+                [strongSelf schedulePresentationWatchdogWithAttempt:attempt + 1];
+            }
+            return;
+        }
+
+        if ([strongSelf isCameraOrMicrophoneDenied]) {
+            [strongSelf completePendingResult:@"idnow_camera_permission_denied"];
             return;
         }
 
@@ -182,16 +214,22 @@
                                                    withCompletionBlock:^(BOOL identificationSuccess, NSError *identificationError, BOOL identificationCanceledByUser) {
                     if (identificationSuccess) {
                         [self completePendingResult:@"success"];
+                    } else if (identificationCanceledByUser) {
+                        [self completePendingResult:@"idnow_cancelled"];
+                    } else if ([self isCameraOrMicrophoneDenied]) {
+                        [self completePendingResult:@"idnow_camera_permission_denied"];
                     } else {
                         NSString *message = identificationError.localizedDescription;
                         if (message.length == 0) {
-                            message = identificationCanceledByUser
-                                ? @"Identification was canceled."
-                                : @"Identification failed.";
+                            message = @"Identification failed.";
                         }
                         [self presentFailureAlertOnViewController:activeViewController message:message];
                     }
                 }];
+            } else if (canceledByUser) {
+                [self completePreStartFailure:@"idnow_cancelled"];
+            } else if ([self isCameraOrMicrophoneDenied]) {
+                [self completePreStartFailure:@"idnow_camera_permission_denied"];
             } else if (error != nil) {
                 [self completePreStartFailure:@"idnow_initialize_failed"];
             } else {
